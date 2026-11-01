@@ -1,0 +1,78 @@
+# 10/31/26 builds the app on a github mac, runs it in the simulator and takes screenshots of all 4 screens
+# this is our replacement for not having a mac, every push to main or develop runs it
+name: build_and_screenshot                     # name that shows up in the actions tab
+
+on:                                            # when this runs
+  push:                                        # on every push
+    branches: [main, develop]                  # only these branches
+  pull_request:                                # also on pull requests so we know it compiles before merging
+  workflow_dispatch:                           # adds a "run workflow" button in the actions tab
+
+permissions:                                   # what the workflow is allowed to touch
+  contents: write                              # needs write so it can commit the xcode project and screenshots back
+
+jobs:                                          # the actual work
+  build:                                       # one job
+    runs-on: macos-15                          # free mac runner from github with xcode installed
+    timeout-minutes: 30                        # kill it if something hangs
+    steps:                                     # runs top to bottom
+      - name: check out the code               # grab the repo
+        uses: actions/checkout@v4              # standard checkout action
+
+      - name: install xcodegen                 # tool that turns project.yml into an xcode project
+        run: brew install xcodegen             # homebrew is already on the runner
+
+      - name: generate the xcode project       # makes TinyView.xcodeproj
+        run: xcodegen generate                 # reads project.yml in the repo root
+
+      - name: pick an iphone simulator         # find an iphone that exists on this runner
+        run: |
+          sim_udid=$(xcrun simctl list devices available --json | jq -r '[.devices | to_entries[] | select(.key | contains("iOS")) | .value[] | select(.name | test("^iPhone [0-9]+$"))] | last | .udid')    # newest plain iPhone (ex: iPhone 16)
+          if [ -z "$sim_udid" ] || [ "$sim_udid" = "null" ]; then    # no plain iPhone found
+            sim_udid=$(xcrun simctl list devices available --json | jq -r '[.devices | to_entries[] | select(.key | contains("iOS")) | .value[] | select(.name | startswith("iPhone"))] | last | .udid')    # take any iPhone instead
+          fi
+          echo "using simulator $sim_udid"     # print it so we can see it in the logs
+          echo "sim_udid=$sim_udid" >> "$GITHUB_ENV"    # save it for the next steps
+
+      - name: build the app                    # compile for the simulator
+        run: |
+          set -o pipefail                      # if xcodebuild fails the step fails, even through the pipe
+          xcodebuild -project TinyView.xcodeproj -scheme TinyView -sdk iphonesimulator -destination "platform=iOS Simulator,id=$sim_udid" -derivedDataPath build CODE_SIGNING_ALLOWED=NO build | tail -n 60    # build without signing, only show the end of the log
+
+      - name: take screenshots                 # run the app and screenshot every screen
+        run: |
+          xcrun simctl boot "$sim_udid" || true    # start the simulator, ignore the error if its already on
+          xcrun simctl bootstatus "$sim_udid" -b   # wait until its fully booted
+          xcrun simctl status_bar "$sim_udid" override --time "9:41" --batteryState charged --batteryLevel 100 --cellularBars 4 --wifiBars 3    # clean apple style status bar
+          app_path=$(find build/Build/Products -maxdepth 2 -name "TinyView.app" | head -n 1)    # where xcodebuild put the app
+          xcrun simctl install "$sim_udid" "$app_path"    # install it on the simulator
+          mkdir -p screenshots                 # folder for the pictures
+          for screen in home library reader edit; do    # one pass per screen
+            xcrun simctl terminate "$sim_udid" edu.csuf.tinyview || true    # close the app from the last pass
+            xcrun simctl launch "$sim_udid" edu.csuf.tinyview -screenshot_screen "$screen"    # scene_delegate.swift reads this and jumps to the screen
+            sleep 8                            # give it time to launch and draw
+            xcrun simctl io "$sim_udid" screenshot "screenshots/${screen}.png"    # save the picture
+          done
+          ls -la screenshots                   # show what we got in the logs
+
+      - name: upload screenshots               # download them from the run page
+        uses: actions/upload-artifact@v4       # standard upload action
+        with:                                  # settings for the upload
+          name: screenshots                    # zip name
+          path: screenshots                    # folder to upload
+
+      - name: commit xcode project and screenshots back to the repo    # spec wants the full xcode project on github
+        if: github.event_name == 'push'        # only on pushes, not pull requests
+        run: |
+          git config user.name "github-actions[bot]"    # commit as the actions bot
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"    # official bot email
+          mkdir -p docs/screenshots            # screenshots live here so the readme can show them
+          cp screenshots/*.png docs/screenshots/    # copy them over
+          git add TinyView.xcodeproj Support docs/screenshots    # stage the generated stuff
+          if git diff --cached --quiet; then   # nothing changed since last time
+            echo "nothing new to commit"       # just say so
+          else                                 # something changed
+            git commit -m "update generated xcode project and screenshots [skip ci]"    # skip ci so this commit doesnt start another run
+            git pull --rebase origin "${GITHUB_REF_NAME}"    # catch up in case someone pushed while this ran
+            git push origin "HEAD:${GITHUB_REF_NAME}"    # push it back
+          fi

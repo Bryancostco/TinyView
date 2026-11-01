@@ -1,0 +1,29 @@
+# 10/31/26 xcodegen reads this and spits out TinyView.xcodeproj (none of us have a mac so we never make the project by hand)
+name: TinyView                                  # project name, makes TinyView.xcodeproj
+options:                                        # project wide settings
+  bundleIdPrefix: edu.csuf                      # start of the bundle id
+  deploymentTarget:                             # oldest os we support
+    iOS: "16.0"                                 # ios 16 and up
+targets:                                        # what gets built
+  TinyView:                                     # the app itself
+    type: application                           # its an app (not a library or test)
+    platform: iOS                               # iphone app
+    sources:                                    # folders that get compiled
+      - path: TinyView                          # every swift file lives here
+    info:                                       # xcodegen writes the Info.plist for us
+      path: Support/Info.plist                  # kept outside the source folder so it doesnt get copied into the app twice
+      properties:                               # extra keys on top of the defaults
+        UILaunchScreen: {}                      # blank launch screen, without this the app shows letterboxed
+        UIApplicationSceneManifest:             # opt into the scene lifecycle (scene_delegate.swift)
+          UIApplicationSupportsMultipleScenes: false    # one window only
+        UISupportedInterfaceOrientations:       # rotations allowed
+          - UIInterfaceOrientationPortrait      # portrait only for milestone 1
+    settings:                                   # build settings
+      base:                                     # applies to debug and release
+        PRODUCT_BUNDLE_IDENTIFIER: edu.csuf.tinyview    # the workflow launches the app using this id
+        TARGETED_DEVICE_FAMILY: "1"             # 1 = iphone only
+        SWIFT_VERSION: "5.0"                    # swift 5 language mode
+        MARKETING_VERSION: "1.0"                # version number people see
+        CURRENT_PROJECT_VERSION: "1"            # build number
+        CODE_SIGN_STYLE: Automatic              # xcode handles signing if someone opens it on a mac
+    scheme: {}                                  # makes a shared scheme so xcodebuild can find it
