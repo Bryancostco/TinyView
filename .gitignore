@@ -1,0 +1,15 @@
+# 10/31/26 stuff git should never track
+# (gitignore only allows comments on their own line, a # after a pattern breaks it)
+
+# xcodebuild output from the workflow
+build/
+# xcode build cache if someone opens it on a mac
+DerivedData/
+# raw screenshots from the workflow, the kept copies go in docs/screenshots
+/screenshots/
+# per person xcode settings
+xcuserdata/
+# per person xcode window state
+*.xcuserstate
+# mac finder junk
+.DS_Store
