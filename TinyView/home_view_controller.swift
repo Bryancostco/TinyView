@@ -12,13 +12,22 @@ final class home_view_controller: UIViewController {
     private let library_count_label = app_theme.make_label(size: 14, color: app_theme.secondary_text_color)    // 7 books
     private let stats_stack = UIStackView()                                                             // the 3 stat tiles row
 
+    // 10/31/26 nav bar stuff goes in init so its set even if a screen gets pushed before home finishes loading
+    init() {
+        super.init(nibName: nil, bundle: nil)             // built in code, no storyboard
+        title = "TinyView"                                // big title at the top
+        navigationItem.largeTitleDisplayMode = .always    // keep it big on home
+        navigationItem.backButtonTitle = "Home"           // the back button on the next screen says Home instead of TinyView
+        navigationItem.rightBarButtonItem = UIBarButtonItem(systemItem: .add, primaryAction: UIAction { [weak self] _ in self?.open_add_book() })    // + in the corner opens add book, weak self so we dont leak memory
+    }
+
+    required init?(coder: NSCoder) {                               // storyboard init, not used
+        fatalError("home_view_controller is made in code only")    // crash loudly if someone tries
+    }
+
     override func viewDidLoad() {                            // uikit calls this once when the screen first loads
         super.viewDidLoad()                                  // let uikit do its thing first
         view.backgroundColor = app_theme.background_color    // warm background
-        title = "TinyView"                                   // big title at the top
-        navigationItem.largeTitleDisplayMode = .always       // keep it big on home
-        navigationItem.backButtonTitle = "Home"              // the back button on the next screen says Home instead of TinyView
-        navigationItem.rightBarButtonItem = UIBarButtonItem(systemItem: .add, primaryAction: UIAction { [weak self] _ in self?.open_add_book() })    // + in the corner opens add book, weak self so we dont leak memory
         build_layout()                                       // make all the views
         refresh_content()                                    // fill them with the sample data
         NotificationCenter.default.addObserver(self, selector: #selector(handle_store_change), name: .book_store_did_change, object: nil)    // refresh if a book gets edited somewhere else

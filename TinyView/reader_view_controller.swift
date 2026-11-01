@@ -74,10 +74,13 @@ final class reader_view_controller: UIViewController, UIScrollViewDelegate, UIGe
         page_scroll_view.translatesAutoresizingMaskIntoConstraints = false    // pinned below
         view.addSubview(page_scroll_view)                                     // put it on screen
 
-        page_image_view.contentMode = .scaleAspectFit                        // whole page visible, no stretching
-        page_image_view.isAccessibilityElement = true                        // voiceover can find the page
-        page_image_view.translatesAutoresizingMaskIntoConstraints = false    // pinned below
-        page_scroll_view.addSubview(page_image_view)                         // page lives in the scroll view
+        page_image_view.contentMode = .scaleAspectFit                                             // whole page visible, no stretching
+        page_image_view.setContentCompressionResistancePriority(.defaultLow, for: .vertical)      // 10/31/26 page gives up space before the control bar does, was squishing the bar
+        page_image_view.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)    // same thing sideways
+        page_image_view.setContentHuggingPriority(.defaultLow, for: .vertical)                    // page is allowed to stretch to fill the space
+        page_image_view.isAccessibilityElement = true                                             // voiceover can find the page
+        page_image_view.translatesAutoresizingMaskIntoConstraints = false                         // pinned below
+        page_scroll_view.addSubview(page_image_view)                                              // page lives in the scroll view
 
         var previous_configuration = UIButton.Configuration.plain()               // plain icon button
         previous_configuration.image = UIImage(systemName: "chevron.left")        // <
@@ -285,6 +288,7 @@ final class reader_view_controller: UIViewController, UIScrollViewDelegate, UIGe
             (narration_lines[page_number % narration_lines.count] as NSString).draw(in: narration_box.insetBy(dx: 10, dy: 8), withAttributes: body_attributes)    // caption text, picks a line based on the page
 
             let bubble_rect = CGRect(x: 30, y: 333, width: 160, height: 80)    // speech bubble in the left panel
+            UIColor.white.setFill()                                            // 10/31/26 reset to white, drawing the caption text above switched the fill to black
             UIBezierPath(ovalIn: bubble_rect).fill()                           // white oval bubble
             (dialogue_lines[page_number % dialogue_lines.count] as NSString).draw(in: bubble_rect.insetBy(dx: 26, dy: 24), withAttributes: body_attributes)    // bubble text
 
